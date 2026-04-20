@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { login, getToken, fetchSpotify } from './lib/spotify.js';
   import { Chart, registerables } from 'chart.js';
   Chart.register(...registerables);
@@ -13,6 +13,8 @@
   let currentTrack = null;
   let isPlaying = false;
   let progressWidth = 38;
+  let moodChartEl;
+  let popularityChartEl;
 
   let moodChart, popularityChart;
 
@@ -40,36 +42,36 @@
       topArtists = artistsData.items || [];
       if (topTracks.length > 0) currentTrack = topTracks[0];
       loading = false;
-      setTimeout(() => {
-        drawPopularityChart();
-        drawMoodChart();
-      }, 500);
+      await tick();
+      await tick();
+      drawPopularityChart();
+      //drawMoodChart();
     }
   });
-
   function drawPopularityChart() {
-    const canvas = document.getElementById('popularityChart');
-    if (!canvas) return;
-    if (popularityChart) popularityChart.destroy();
+    //const canvas = document.getElementById('popularityChart');
+    if (!popularityChartEl) return;
+    //if (popularityChart) popularityChart.destroy();
+    if (popularityChart) { popularityChart.destroy(); popularityChart = null; }
     const labels = topTracks.slice(0, 7).map(t =>
             t.name.length > 12 ? t.name.slice(0, 12) + '...' : t.name
     );
-    popularityChart = new Chart(canvas, {
+    popularityChart = new Chart(popularityChartEl, {
       type: 'bar',
       data: {
         labels,
         datasets: [{
           label: 'Популарност',
           data: topTracks.slice(0, 7).map(t => t.popularity),
-          backgroundColor: '#ff4d7d',
+          backgroundColor: '#eb5e28',
           borderRadius: 8,
         }]
       },
       options: {
         plugins: { legend: { display: false } },
         scales: {
-          y: { beginAtZero: true, max: 100, ticks: { color: '#7b7b9a' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-          x: { ticks: { color: '#7b7b9a', font: { size: 10 } }, grid: { display: false } }
+          y: { beginAtZero: true, max: 100, ticks: { color: '#ccc5b9' }, grid: { color: 'rgba(255,252,242,0.08)' } },
+          x: { ticks: { color: '#ccc5b9', font: { size: 10 } }, grid: { display: false } }
         }
       }
     });
@@ -77,30 +79,31 @@
 
   function drawMoodChart() {
     const canvas = document.getElementById('moodChart');
-    if (!canvas) return;
-    if (moodChart) moodChart.destroy();
+    if (!moodChartEl) return;
+    //if (moodChart) moodChart.destroy();
+    if (moodChart) { moodChart.destroy(); moodChart = null; }
     const avgPop = topTracks.reduce((s, t) => s + t.popularity, 0) / (topTracks.length || 1);
     const avgDur = topTracks.reduce((s, t) => s + t.duration_ms, 0) / (topTracks.length || 1);
     const explicit = topTracks.filter(t => t.explicit).length / (topTracks.length || 1) * 100;
     const newReleases = topTracks.filter(t => new Date(t.album.release_date).getFullYear() >= 2023).length / (topTracks.length || 1) * 100;
     const variety = Math.min(100, new Set(topArtists.map(a => a.genres?.[0])).size / 5 * 100);
     const underground = topArtists.filter(a => a.popularity < 60).length / (topArtists.length || 1) * 100;
-    moodChart = new Chart(canvas, {
+    moodChart = new Chart(moodChartEl, {
       type: 'radar',
       data: {
         labels: ['Популарност', 'Должина', 'Explicit', 'Разновидност', 'Нови', 'Независни'],
         datasets: [{
           data: [
             Math.round(avgPop),
-            Math.min(100, Math.round(avgDur / 3000)),
+            Math.min(100, Math.round((avgDur / 300000) * 100)),
             Math.round(explicit),
             Math.round(variety),
             Math.round(newReleases),
             Math.round(underground),
           ],
           backgroundColor: 'rgba(255,77,125,0.15)',
-          borderColor: '#ff4d7d',
-          pointBackgroundColor: '#ff4d7d',
+          borderColor: '#eb5e28',
+          pointBackgroundColor: '#eb5e28',
           borderWidth: 2,
         }]
       },
@@ -109,8 +112,8 @@
           r: {
             min: 0, max: 100,
             ticks: { display: false },
-            grid: { color: 'rgba(255,255,255,0.07)' },
-            pointLabels: { color: '#7b7b9a', font: { size: 10 } }
+            grid: { color: 'rgba(255,252,242,0.08)' },
+            pointLabels: { color: '#ccc5b9', font: { size: 10 } }
           }
         },
         plugins: { legend: { display: false } }
@@ -145,10 +148,11 @@
     isPlaying = !isPlaying;
   }
 
-  function setTab(tab) {
+  async function setTab(tab) {
     activeTab = tab;
-    if (tab === 'mood') setTimeout(drawMoodChart, 100);
-    if (tab === 'overview') setTimeout(drawPopularityChart, 100);
+    await tick();
+    if (tab === 'mood') drawMoodChart();
+    if (tab === 'overview') drawPopularityChart();
   }
 
   function logout() {
@@ -172,12 +176,39 @@
   ];
 </script>
 
+<!--{#if !token}-->
+<!--  <div class="login">-->
+<!--    <img src="../public/♫ (1).png" alt="Sound Alchemy" class="logo-img"/>-->
+<!--    <h1>Sound Alchemy</h1>-->
+<!--    <p>Analyze Your Audio Identity</p>-->
+<!--    <button class="spotify-btn" on:click={login}>Continue with Spotify</button>-->
+<!--  </div>-->
 {#if !token}
   <div class="login">
-    <div class="logo">🎵</div>
-    <h1>Music Analyzer</h1>
-    <p>Откриј ги твоите музички навики</p>
-    <button class="spotify-btn" on:click={login}>Поврзи со Spotify</button>
+    <div class="sa-logo">
+      <svg width="58" height="52" viewBox="0 0 58 52" fill="none">
+        <rect x="26" y="4" width="6" height="44" rx="3" fill="#1a1917" opacity="0.9"/>
+        <rect x="18" y="12" width="6" height="28" rx="3" fill="#1a1917" opacity="0.85"/>
+        <rect x="34" y="12" width="6" height="28" rx="3" fill="#1a1917" opacity="0.85"/>
+        <rect x="10" y="18" width="6" height="16" rx="3" fill="#1a1917" opacity="0.75"/>
+        <rect x="42" y="18" width="6" height="16" rx="3" fill="#1a1917" opacity="0.75"/>
+        <circle cx="7" cy="26" r="3.5" stroke="#1a1917" stroke-width="2" fill="none" opacity="0.75"/>
+        <circle cx="51" cy="26" r="3.5" stroke="#1a1917" stroke-width="2" fill="none" opacity="0.75"/>
+      </svg>
+    </div>
+    <h1>Sound Alchemy</h1>
+    <p>Analyze Your Audio Identity</p>
+    <button class="spotify-btn" on:click={login}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+      </svg>
+      Continue with Spotify
+    </button>
+    <div class="login-dots">
+      <div class="login-dot active"></div>
+      <div class="login-dot"></div>
+      <div class="login-dot"></div>
+    </div>
   </div>
 
 {:else if loading}
@@ -193,7 +224,7 @@
     <div class="nav">
       <div class="nav-left">
         <span class="nav-logo">🎵</span>
-        <span class="nav-title">Music Analyzer</span>
+        <span class="nav-title">Sound Alchemy</span>
       </div>
       <div class="tabs">
         <button class:active={activeTab === 'overview'} on:click={() => setTab('overview')}>Преглед</button>
@@ -216,15 +247,15 @@
     <div class="stats-row">
       <div class="stat-card">
         <span class="stat-num">{topTracks.length}</span>
-        <span class="stat-label">Топ песни</span>
+        <span class="stat-label">Top songs</span>
       </div>
       <div class="stat-card">
         <span class="stat-num">{topArtists.length}</span>
-        <span class="stat-label">Топ артисти</span>
+        <span class="stat-label">Top artists</span>
       </div>
       <div class="stat-card">
         <span class="stat-num">{getTotalMinutes()}м</span>
-        <span class="stat-label">Минути</span>
+        <span class="stat-label">Minutes</span>
       </div>
       <div class="stat-card">
         <span class="stat-num">{getMoodEmoji().emoji}</span>
@@ -264,7 +295,7 @@
         <div class="section">
           <div class="section-header"><h3>Популарност на топ песни</h3></div>
           <div class="chart-box">
-            <canvas id="popularityChart"></canvas>
+            <canvas bind:this={popularityChartEl}></canvas>
           </div>
         </div>
 
@@ -327,7 +358,7 @@
             <span class="mood-label">{getMoodEmoji().label}</span>
           </div>
           <div class="chart-box">
-            <canvas id="moodChart"></canvas>
+            <canvas bind:this={moodChartEl}></canvas>
           </div>
           <div class="mood-bars">
             {#each [
@@ -386,28 +417,125 @@
 {/if}
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   :global(body) {
-    background: #0d0d14;
+    background: #252422;
     color: white;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     min-height: 100vh;
   }
 
   .login {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; height: 100vh; gap: 16px;
-    background: #0d0d14; color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 0;
+    background: #1a1917;
+    color: white;
+  }
+
+  .sa-logo {
+    width: 110px;
+    height: 110px;
+    background: linear-gradient(145deg, #f07843, #eb5e28);
+    border-radius: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+    box-shadow: 0 0 0 1px rgba(235, 94, 40, 0.3), 0 20px 60px rgba(235, 94, 40, 0.25);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sa-logo::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 60%);
+    border-radius: 28px;
+  }
+
+  .login h1 {
+    font-size: 30px;
+    font-weight: 700;
+    color: #fffcf2;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+    line-height: 1.1;
+  }
+
+  .login p {
+    font-size: 14px;
+    color: #8c8984;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 400;
+    margin-bottom: 36px;
+  }
+
+  .spotify-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #1DB954;
+    color: #fff;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 50px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.1px;
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+    box-shadow: 0 4px 24px rgba(29, 185, 84, 0.35);
+  }
+
+  .spotify-btn:hover {
+    background: #1ed760;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 32px rgba(29, 185, 84, 0.45);
+  }
+
+  .spotify-btn:active {
+    transform: scale(0.97);
+  }
+
+  .login-dots {
+    display: flex;
+    gap: 6px;
+    margin-top: 40px;
+  }
+
+  .login-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #3a3835;
+  }
+
+  .login-dot.active {
+    background: #eb5e28;
+  }
+  .logo-img {
+    width: 200px;
+    height: auto;
+    border-radius: 20px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 20px rgba(235, 94, 40, 0.3));
   }
   .logo { font-size: 4rem; }
   .login h1 { font-family: 'Syne', sans-serif; font-size: 2.2rem; }
-  .login p { color: #7b7b9a; }
+  .login p { color: #ccc5b9; }
   .spinner {
     width: 40px; height: 40px; border: 3px solid #222;
-    border-top-color: #ff4d7d; border-radius: 50%;
+    border-top-color: #eb5e28; border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -415,8 +543,9 @@
   .spotify-btn {
     background: #1DB954; color: white; border: none;
     padding: 14px 36px; border-radius: 50px;
-    font-size: 16px; font-family: 'DM Sans', sans-serif;
+    font-size: 16px; font-family: 'Inter', sans-serif;
     cursor: pointer; font-weight: 500;
+
   }
   .spotify-btn:hover { background: #1aa34a; }
 
@@ -429,8 +558,8 @@
   .nav {
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px 0; margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    position: sticky; top: 0; background: rgba(13,13,20,0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    position: sticky; top: 0; background: rgba(37, 36, 34, 0.95);
     backdrop-filter: blur(20px); z-index: 100;
   }
   .nav-left { display: flex; align-items: center; gap: 10px; }
@@ -440,27 +569,27 @@
   .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
   .avatar-placeholder {
     width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg, #ff4d7d, #a855f7);
+    background: #eb5e28;
     display: flex; align-items: center; justify-content: center;
   }
-  .username { font-size: 13px; color: #aaa; }
+  .username { font-size: 13px; color: #ccc5b9; }
   .logout-btn {
-    background: transparent; color: #666; border: 1px solid #333;
+    background: transparent; color: #ccc5b9; border: 1px solid #333;
     padding: 6px 14px; border-radius: 50px; cursor: pointer; font-size: 12px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
   }
-  .logout-btn:hover { color: white; border-color: #555; }
+  .logout-btn:hover { color: white; border-color: #ccc5b9; }
 
   /* TABS */
   .tabs { display: flex; gap: 6px; }
   .tabs button {
-    background: rgba(255,255,255,0.05); color: #7b7b9a;
+    background: rgba(255, 252, 242, 0.08); color: #ccc5b9;
     border: none; padding: 8px 16px; border-radius: 50px;
-    cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; font-size: 13px; font-family: 'Inter', sans-serif;
     transition: all 0.2s;
   }
-  .tabs button.active { background: #ff4d7d; color: white; }
-  .tabs button:hover:not(.active) { color: white; background: rgba(255,255,255,0.1); }
+  .tabs button.active { background: #eb5e28; color: white; }
+  .tabs button:hover:not(.active) { color: white; background: rgba(255, 252, 242, 0.1); }
 
   /* STATS */
   .stats-row {
@@ -468,11 +597,11 @@
     gap: 12px; margin-bottom: 24px;
   }
   .stat-card {
-    background: #13131f; border-radius: 14px; padding: 16px;
-    text-align: center; border: 1px solid rgba(255,255,255,0.05);
+    background: #403d39; border-radius: 14px; padding: 16px;
+    text-align: center; border: 1px solid rgba(255, 252, 242, 0.08);
   }
-  .stat-num { display: block; font-size: 1.8rem; font-weight: 700; color: #ff4d7d; font-family: 'Syne', sans-serif; }
-  .stat-label { font-size: 0.75rem; color: #7b7b9a; margin-top: 4px; display: block; }
+  .stat-num { display: block; font-size: 1.8rem; font-weight: 700; color: #eb5e28; font-family: 'Syne', sans-serif; }
+  .stat-label { font-size: 0.75rem; color: #ccc5b9; margin-top: 4px; display: block; }
 
   .content { display: flex; flex-direction: column; gap: 28px; }
 
@@ -499,19 +628,19 @@
     opacity: 0; transition: opacity 0.2s;
   }
   .play-btn-circle {
-    width: 40px; height: 40px; border-radius: 50%; background: #ff4d7d;
+    width: 40px; height: 40px; border-radius: 50%; background: #eb5e28;
     display: flex; align-items: center; justify-content: center;
-    font-size: 14px; box-shadow: 0 4px 20px rgba(255,77,125,0.5);
+    font-size: 14px; box-shadow: 0 4px 20px rgba(235, 94, 40, 0.4);
   }
-  .active-album .album-thumb { box-shadow: 0 0 0 2px #ff4d7d; }
-  .active-album .album-name { color: #ff4d7d; }
+  .active-album .album-thumb { box-shadow: 0 0 0 2px #eb5e28; }
+  .active-album .album-name { color: #eb5e28; }
   .album-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .album-artist { font-size: 11px; color: #7b7b9a; }
+  .album-artist { font-size: 11px; color: #ccc5b9; }
 
   /* CHART */
   .chart-box {
-    background: #13131f; border-radius: 14px; padding: 16px;
-    border: 1px solid rgba(255,255,255,0.05);
+    background: #403d39; border-radius: 14px; padding: 16px;
+    border: 1px solid rgba(255, 252, 242, 0.08);
   }
 
   /* TRACKS */
@@ -521,12 +650,12 @@
     padding: 10px 12px; border-radius: 10px; cursor: pointer;
     transition: background 0.15s;
   }
-  .track-item:hover { background: rgba(255,255,255,0.05); }
+  .track-item:hover { background: rgba(255, 252, 242, 0.08); }
   .track-item.playing {
     background: linear-gradient(90deg, rgba(255,77,125,0.12), transparent);
     border: 1px solid rgba(255,77,125,0.2);
   }
-  .rank { color: #ff4d7d; font-weight: 700; width: 28px; font-size: 13px; font-family: 'Syne', sans-serif; }
+  .rank { color: #eb5e28; font-weight: 700; width: 28px; font-size: 13px; font-family: 'Syne', sans-serif; }
   .track-thumb { width: 46px; height: 46px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
   .track-thumb img { width: 100%; height: 100%; object-fit: cover; }
   .thumb-placeholder {
@@ -535,11 +664,11 @@
   }
   .track-info { flex: 1; min-width: 0; }
   .track-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .track-artist { font-size: 12px; color: #7b7b9a; }
-  .track-item.playing .track-name { color: #ff4d7d; }
-  .duration { font-size: 12px; color: #555; }
+  .track-artist { font-size: 12px; color: #ccc5b9; }
+  .track-item.playing .track-name { color: #eb5e28; }
+  .duration { font-size: 12px; color: #ccc5b9; }
   .pop-badge {
-    background: rgba(255,77,125,0.15); color: #ff4d7d;
+    background: rgba(255,77,125,0.15); color: #eb5e28;
     font-size: 11px; font-weight: 700; padding: 3px 10px;
     border-radius: 50px;
   }
@@ -547,7 +676,7 @@
   /* PLAYING INDICATOR */
   .playing-indicator { display: flex; gap: 2px; align-items: flex-end; height: 16px; }
   .playing-indicator span {
-    display: block; width: 3px; background: #ff4d7d; border-radius: 2px;
+    display: block; width: 3px; background: #eb5e28; border-radius: 2px;
     animation: bounce 0.8s ease infinite;
   }
   .playing-indicator span:nth-child(2) { animation-delay: 0.15s; }
@@ -557,8 +686,8 @@
   /* ARTISTS */
   .artists-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
   .artist-card {
-    background: #13131f; border-radius: 14px; padding: 14px;
-    text-align: center; border: 1px solid rgba(255,255,255,0.05);
+    background: #403d39; border-radius: 14px; padding: 14px;
+    text-align: center; border: 1px solid rgba(255, 252, 242, 0.08);
     transition: transform 0.2s;
   }
   .artist-card:hover { transform: translateY(-3px); }
@@ -569,41 +698,41 @@
     font-size: 2rem; margin-bottom: 10px;
   }
   .artist-name { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-  .artist-rank { display: block; font-size: 11px; color: #ff4d7d; }
-  .genre { display: block; font-size: 10px; color: #555; margin-top: 3px; }
+  .artist-rank { display: block; font-size: 11px; color: #eb5e28; }
+  .genre { display: block; font-size: 10px; color: #ccc5b9; margin-top: 3px; }
 
   /* MOOD */
   .mood-top { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 16px; }
   .big-emoji { font-size: 3rem; }
-  .mood-label { font-family: 'Syne', sans-serif; font-size: 1.2rem; color: #ff4d7d; font-weight: 700; }
+  .mood-label { font-family: 'Syne', sans-serif; font-size: 1.2rem; color: #eb5e28; font-weight: 700; }
   .mood-bars { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
   .mood-bar-row { display: flex; align-items: center; gap: 12px; }
-  .mood-bar-row span:first-child { width: 180px; font-size: 12px; color: #aaa; flex-shrink: 0; }
-  .bar-bg { flex: 1; background: rgba(255,255,255,0.07); border-radius: 50px; height: 6px; }
-  .bar-fill { background: #ff4d7d; height: 6px; border-radius: 50px; transition: width 0.6s ease; }
-  .pct { width: 36px; font-size: 12px; color: #555; text-align: right; }
+  .mood-bar-row span:first-child { width: 180px; font-size: 12px; color: #ccc5b9; flex-shrink: 0; }
+  .bar-bg { flex: 1; background: rgba(255, 255, 255, 0.07); border-radius: 50px; height: 6px; }
+  .bar-fill { background: #eb5e28; height: 6px; border-radius: 50px; transition: width 0.6s ease; }
+  .pct { width: 36px; font-size: 12px; color: #ccc5b9; text-align: right; }
 
   /* PLAYER */
   .player-bar {
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(13,13,20,0.97); backdrop-filter: blur(30px);
-    border-top: 1px solid rgba(255,255,255,0.07);
+    background: rgba(37, 36, 34, 0.97); backdrop-filter: blur(30px);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
     padding: 12px 28px; display: flex; align-items: center; gap: 20px; z-index: 200;
   }
   .player-track { display: flex; align-items: center; gap: 12px; width: 240px; }
   .player-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
   .player-thumb-placeholder {
     width: 44px; height: 44px; border-radius: 8px;
-    background: linear-gradient(135deg, #ff4d7d, #a855f7);
+    background: #eb5e28;
     display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;
   }
   .player-info { min-width: 0; }
   .player-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .player-artist { font-size: 11px; color: #7b7b9a; }
+  .player-artist { font-size: 11px; color: #ccc5b9; }
   .player-controls { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .ctrl-btns { display: flex; align-items: center; gap: 16px; }
   .ctrl-btn {
-    background: none; border: none; color: #7b7b9a;
+    background: none; border: none; color: #ccc5b9;
     font-size: 18px; cursor: pointer; transition: color 0.15s;
   }
   .ctrl-btn:hover { color: white; }
@@ -616,10 +745,10 @@
   }
   .play-main:hover { transform: scale(1.08); }
   .progress-wrap { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 380px; }
-  .time { font-size: 11px; color: #555; }
-  .progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.12); border-radius: 3px; }
+  .time { font-size: 11px; color: #ccc5b9; }
+  .progress-track { flex: 1; height: 3px; background: rgba(255, 252, 242, 0.15); border-radius: 3px; }
   .progress-fill { height: 100%; background: white; border-radius: 3px; }
-  .player-right { display: flex; align-items: center; gap: 10px; width: 160px; justify-content: flex-end; color: #7b7b9a; font-size: 16px; }
-  .vol-track { width: 70px; height: 3px; background: rgba(255,255,255,0.12); border-radius: 3px; }
+  .player-right { display: flex; align-items: center; gap: 10px; width: 160px; justify-content: flex-end; color: #ccc5b9; font-size: 16px; }
+  .vol-track { width: 70px; height: 3px; background: rgba(255, 252, 242, 0.15); border-radius: 3px; }
   .vol-fill { height: 100%; width: 70%; background: white; border-radius: 3px; }
 </style>
