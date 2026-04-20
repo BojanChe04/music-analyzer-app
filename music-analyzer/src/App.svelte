@@ -214,7 +214,7 @@
 {:else if loading}
   <div class="login">
     <div class="spinner"></div>
-    <p>Вчитување...</p>
+    <p>Loading...</p>
   </div>
 
 {:else}
@@ -223,13 +223,23 @@
     <!-- NAV -->
     <div class="nav">
       <div class="nav-left">
-        <span class="nav-logo">🎵</span>
+        <div class="nav-logo-svg">
+          <svg width="52" height="48" viewBox="0 0 58 52" fill="none">
+            <rect x="26" y="4" width="6" height="44" rx="3" fill="#eb5e28"/>
+            <rect x="18" y="12" width="6" height="28" rx="3" fill="#eb5e28" opacity="0.85"/>
+            <rect x="34" y="12" width="6" height="28" rx="3" fill="#eb5e28" opacity="0.85"/>
+            <rect x="10" y="18" width="6" height="16" rx="3" fill="#eb5e28" opacity="0.75"/>
+            <rect x="42" y="18" width="6" height="16" rx="3" fill="#eb5e28" opacity="0.75"/>
+            <circle cx="7" cy="26" r="3.5" stroke="#eb5e28" stroke-width="2" fill="none" opacity="0.75"/>
+            <circle cx="51" cy="26" r="3.5" stroke="#eb5e28" stroke-width="2" fill="none" opacity="0.75"/>
+          </svg>
+        </div>
         <span class="nav-title">Sound Alchemy</span>
       </div>
       <div class="tabs">
-        <button class:active={activeTab === 'overview'} on:click={() => setTab('overview')}>Преглед</button>
-        <button class:active={activeTab === 'tracks'} on:click={() => setTab('tracks')}>Песни</button>
-        <button class:active={activeTab === 'artists'} on:click={() => setTab('artists')}>Артисти</button>
+        <button class:active={activeTab === 'overview'} on:click={() => setTab('overview')}>Overview</button>
+        <button class:active={activeTab === 'tracks'} on:click={() => setTab('tracks')}>Tracks</button>
+        <button class:active={activeTab === 'artists'} on:click={() => setTab('artists')}>Artists</button>
         <button class:active={activeTab === 'mood'} on:click={() => setTab('mood')}>Mood</button>
       </div>
       <div class="nav-right">
@@ -239,7 +249,7 @@
           <div class="avatar-placeholder">👤</div>
         {/if}
         <span class="username">{user?.display_name}</span>
-        <button class="logout-btn" on:click={logout}>Одјави се</button>
+        <button class="logout-btn" on:click={logout}>Logout</button>
       </div>
     </div>
 
@@ -254,7 +264,7 @@
         <span class="stat-label">Top artists</span>
       </div>
       <div class="stat-card">
-        <span class="stat-num">{getTotalMinutes()}м</span>
+        <span class="stat-num">{getTotalMinutes()}</span>
         <span class="stat-label">Minutes</span>
       </div>
       <div class="stat-card">
@@ -271,7 +281,7 @@
         <!-- Top Albums row -->
         <div class="section">
           <div class="section-header">
-            <h3>Топ албуми</h3>
+            <h3>Top albums</h3>
           </div>
           <div class="albums-row">
             {#each topTracks.slice(0, 6) as track, i}
@@ -293,7 +303,7 @@
 
         <!-- Chart -->
         <div class="section">
-          <div class="section-header"><h3>Популарност на топ песни</h3></div>
+          <div class="section-header"><h3>Top Tracks Popularity</h3></div>
           <div class="chart-box">
             <canvas bind:this={popularityChartEl}></canvas>
           </div>
@@ -301,7 +311,7 @@
 
       {:else if activeTab === 'tracks'}
         <div class="section">
-          <div class="section-header"><h3>Твоите топ песни</h3></div>
+          <div class="section-header"><h3>Your Top Tracks</h3></div>
           <div class="track-list">
             {#each topTracks as track, i}
               <div class="track-item" class:playing={currentTrack?.id === track.id} on:click={() => playTrack(track)}>
@@ -331,7 +341,7 @@
 
       {:else if activeTab === 'artists'}
         <div class="section">
-          <div class="section-header"><h3>Твоите топ артисти</h3></div>
+          <div class="section-header"><h3>Your Top Artists</h3></div>
           <div class="artists-grid">
             {#each topArtists as artist, i}
               <div class="artist-card">
@@ -352,7 +362,7 @@
 
       {:else if activeTab === 'mood'}
         <div class="section">
-          <div class="section-header"><h3>Твој музички профил</h3></div>
+          <div class="section-header"><h3>Your Music Profile</h3></div>
           <div class="mood-top">
             <span class="big-emoji">{getMoodEmoji().emoji}</span>
             <span class="mood-label">{getMoodEmoji().label}</span>
@@ -422,10 +432,12 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   :global(body) {
-    background: #252422;
+    /*background: #252422;*/
+    background: #1a1917;
     color: white;
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
+    margin: 0;
   }
 
   .login {
@@ -437,6 +449,7 @@
     gap: 0;
     background: #1a1917;
     color: white;
+
   }
 
   .sa-logo {
@@ -452,6 +465,7 @@
     position: relative;
     overflow: hidden;
   }
+  .nav-logo-svg { display: flex; align-items: center; }
 
   .sa-logo::before {
     content: '';
@@ -531,7 +545,7 @@
     filter: drop-shadow(0 4px 20px rgba(235, 94, 40, 0.3));
   }
   .logo { font-size: 4rem; }
-  .login h1 { font-family: 'Syne', sans-serif; font-size: 2.2rem; }
+  .login h1 { font-family: 'Inter', sans-serif; font-size: 2.2rem; }
   .login p { color: #ccc5b9; }
   .spinner {
     width: 40px; height: 40px; border: 3px solid #222;
@@ -550,21 +564,24 @@
   .spotify-btn:hover { background: #1aa34a; }
 
   .app {
-    max-width: 900px; margin: 0 auto;
-    padding: 0 16px 100px; min-height: 100vh;
+    max-width: 100%; margin: 0 ;
+    padding: 0 32px 100px; min-height: 100vh;
   }
 
   /* NAV */
   .nav {
+    height: 100px;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 0; margin-bottom: 20px;
+    padding: 14px 32px; margin-bottom: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    position: sticky; top: 0; background: rgba(37, 36, 34, 0.95);
+    position: sticky; top: 0;
+    background: rgba(26, 25, 23, 0.97);
     backdrop-filter: blur(20px); z-index: 100;
+    margin-left: -32px; margin-right: -32px;
   }
   .nav-left { display: flex; align-items: center; gap: 10px; }
   .nav-logo { font-size: 1.4rem; }
-  .nav-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1rem; }
+  .nav-title { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 1.5rem; }
   .nav-right { display: flex; align-items: center; gap: 10px; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
   .avatar-placeholder {
@@ -594,19 +611,20 @@
   /* STATS */
   .stats-row {
     display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: 12px; margin-bottom: 24px;
+    gap: 40px; margin-bottom: 24px;
   }
   .stat-card {
     background: #403d39; border-radius: 14px; padding: 16px;
+
     text-align: center; border: 1px solid rgba(255, 252, 242, 0.08);
   }
-  .stat-num { display: block; font-size: 1.8rem; font-weight: 700; color: #eb5e28; font-family: 'Syne', sans-serif; }
+  .stat-num { display: block; font-size: 1.8rem; font-weight: 700; color: #eb5e28; font-family: 'Inter', sans-serif; }
   .stat-label { font-size: 0.75rem; color: #ccc5b9; margin-top: 4px; display: block; }
 
   .content { display: flex; flex-direction: column; gap: 28px; }
 
-  .section-header { margin-bottom: 16px; }
-  .section-header h3 { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; }
+  .section-header { margin-bottom: 20px; margin-top: 20px}
+  .section-header h3 { font-family: 'Inter', sans-serif; font-size: 1.5rem; font-weight: 700; padding: 10px }
 
   /* ALBUMS */
   .albums-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
@@ -655,7 +673,7 @@
     background: linear-gradient(90deg, rgba(255,77,125,0.12), transparent);
     border: 1px solid rgba(255,77,125,0.2);
   }
-  .rank { color: #eb5e28; font-weight: 700; width: 28px; font-size: 13px; font-family: 'Syne', sans-serif; }
+  .rank { color: #eb5e28; font-weight: 700; width: 28px; font-size: 13px; font-family: 'Inter', sans-serif; }
   .track-thumb { width: 46px; height: 46px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
   .track-thumb img { width: 100%; height: 100%; object-fit: cover; }
   .thumb-placeholder {
@@ -704,7 +722,7 @@
   /* MOOD */
   .mood-top { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 16px; }
   .big-emoji { font-size: 3rem; }
-  .mood-label { font-family: 'Syne', sans-serif; font-size: 1.2rem; color: #eb5e28; font-weight: 700; }
+  .mood-label { font-family: 'Inter', sans-serif; font-size: 1.2rem; color: #eb5e28; font-weight: 700; }
   .mood-bars { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
   .mood-bar-row { display: flex; align-items: center; gap: 12px; }
   .mood-bar-row span:first-child { width: 180px; font-size: 12px; color: #ccc5b9; flex-shrink: 0; }
