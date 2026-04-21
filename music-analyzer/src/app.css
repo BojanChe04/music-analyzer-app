@@ -294,3 +294,11 @@ code {
     border-right-color: var(--border);
   }
 }
+.chart-box {
+  background: #403d39;
+  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 252, 242, 0.08);
+  height: 280px;  /* ← DODAJ OVO */
+  position: relative; /* ← I OVO */
+}
