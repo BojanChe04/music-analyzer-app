@@ -110,6 +110,13 @@ export async function playTrackOnDevice(token, trackUri, deviceId) {
         body: JSON.stringify({ uris: [trackUri] }),
     });
 }
+
+
+
+
+
+
+
 // const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 // const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI;
 // const SCOPES = import.meta.env.VITE_SCOPES;

@@ -1035,14 +1035,20 @@
     }
 
     /* CHART */
+
     .chart-box {
+        display: flex;
+        justify-content: center;
+        height: 600px;
         background: #403d39;
         border-radius: 14px;
-        padding: 16px;
+        padding: 30px;
         border: 1px solid rgba(255, 252, 242, 0.08);
+
     }
     .chart-box canvas {
-        max-height: 280px;
+        max-height: 500px;
+        align-content: center;
     }
 
     /* TRACKS */
@@ -1212,14 +1218,14 @@
 
     .artist-name {
         display: block;
-        font-size: 13px;
+        font-size: 20px;
         font-weight: 600;
         margin-bottom: 4px;
     }
 
     .artist-rank {
         display: block;
-        font-size: 11px;
+        font-size: 20px;
         color: #eb5e28;
     }
 
@@ -1248,6 +1254,7 @@
         font-size: 1.2rem;
         color: #eb5e28;
         font-weight: 700;
+        margin-top: 15px;
     }
 
     .mood-bars {
