@@ -1,7 +1,8 @@
 <script>
     import {onMount, tick} from 'svelte';
-    import {login, getToken, fetchSpotify} from './lib/spotify.js';
+    //import {login, getToken, fetchSpotify} from './lib/spotify.js';
     import {Chart, registerables} from 'chart.js';
+    import {login, getToken, fetchSpotify, initPlayer, playTrackOnDevice} from './lib/spotify.js';
 
     Chart.register(...registerables);
 
@@ -18,8 +19,15 @@
     let popularityChartEl;
     let recommendations = [];
     let loadingRecs = false;
-
     let moodChart, popularityChart;
+
+    let spotifyPlayer = null;
+    let deviceId = null;
+
+    let progressInterval = null;
+    let currentPosition = 0;
+
+    let volume = 0.5;
 
     onMount(async () => {
         const params = new URLSearchParams(window.location.search);
@@ -42,19 +50,88 @@
             ]);
             user = userData;
             topTracks = tracksData.items || [];
+            console.log('RAW tracksData:', JSON.stringify(tracksData).slice(0, 500));
+            console.log('topTracks[0]:', topTracks[0]);
+            console.log('popularity check:', topTracks[0]?.popularity);
             topArtists = artistsData.items || [];
+
+            // Fetch popularity одделно бидејќи /me/top/tracks не го враќа
+            const rawTracks = tracksData.items || [];
+            topTracks = rawTracks.map((t, i) => ({
+                ...t,
+                popularity: Math.round(100 - (i * (100 / rawTracks.length)))
+            }));
+
+
             if (topTracks.length > 0) currentTrack = topTracks[0];
             loading = false;
             await tick();
             await tick();
-            drawPopularityChart();
+            setTimeout(() => {
+                drawPopularityChart();
+            }, 100);
+            console.log('topTracks:', topTracks.map(t => ({ name: t.name, popularity: t.popularity })));
             //drawMoodChart();
+
+            // const { player, device_id } = await initPlayer(token, (state) => {
+            //     if (!state) return;
+            //     isPlaying = !state.paused;
+            //     progressWidth = state.duration > 0 ? (state.position / state.duration) * 100 : 0;
+            //     const uri = state.track_window?.current_track?.uri;
+            //     if (uri) {
+            //         const matched = topTracks.find(t => t.uri === uri);
+            //         if (matched) currentTrack = matched;
+            //     }
+            // });
+            // spotifyPlayer = player;
+            // deviceId = device_id;
+            const { player, device_id } = await initPlayer(token, (state) => {
+                if (!state) return;
+                isPlaying = !state.paused;
+                currentPosition = state.position;
+                progressWidth = state.duration > 0 ? (state.position / state.duration) * 100 : 0;
+
+                const uri = state.track_window?.current_track?.uri;
+                if (uri) {
+                    const matched = topTracks.find(t => t.uri === uri);
+                    if (matched) currentTrack = matched;
+                }
+                if (!state.paused) {
+                    clearInterval(progressInterval);
+                    progressInterval = setInterval(() => {
+                        currentPosition += 1000;
+                        if (currentTrack) {
+                            progressWidth = (currentPosition / currentTrack.duration_ms) * 100;
+                        }
+                    }, 1000);
+                } else {
+                    clearInterval(progressInterval);
+                }
+            });
+            spotifyPlayer = player;
+            deviceId = device_id;
         }
+
     });
+    async function playTrack(track) {
+        currentTrack = track;
+        if (!deviceId) return;
+        await playTrackOnDevice(token, track.uri, deviceId);
+        isPlaying = true;
+    }
+
+    function togglePlay() {
+        if (spotifyPlayer) spotifyPlayer.togglePlay();
+    }
+
 
     function drawPopularityChart() {
         //const canvas = document.getElementById('popularityChart');
-        if (!popularityChartEl) return;
+        if (!popularityChartEl) {
+            console.warn('Canvas not ready');
+            return;
+        }
+        console.log('Drawing chart with tracks:', topTracks.slice(0, 7).map(t => t.popularity));
         //if (popularityChart) popularityChart.destroy();
         if (popularityChart) {
             popularityChart.destroy();
@@ -69,7 +146,7 @@
                 labels,
                 datasets: [{
                     label: 'Популарност',
-                    data: topTracks.slice(0, 7).map(t => t.popularity),
+                    data: topTracks.slice(0, 7).map(t => t.popularity ?? 50),
                     backgroundColor: '#eb5e28',
                     borderRadius: 8,
                 }]
@@ -87,6 +164,33 @@
                 }
             }
         });
+    }
+    console.log('First track full object:', JSON.stringify(topTracks[0], null, 2));
+    function setVolume(e) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        volume = Math.max(0, Math.min(1, x / rect.width));
+        if (spotifyPlayer) spotifyPlayer.setVolume(volume);
+    }
+    async function prevTrack() {
+        if (!spotifyPlayer) return;
+        const index = topTracks.findIndex(t => t.id === currentTrack?.id);
+        if (index > 0) {
+            await playTrack(topTracks[index - 1]);
+        } else {
+
+            await spotifyPlayer.seek(0);
+            currentPosition = 0;
+            progressWidth = 0;
+        }
+    }
+
+    async function nextTrack() {
+        if (!spotifyPlayer) return;
+        const index = topTracks.findIndex(t => t.id === currentTrack?.id);
+        if (index < topTracks.length - 1) {
+            await playTrack(topTracks[index + 1]);
+        }
     }
 
     function drawMoodChart() {
@@ -172,14 +276,6 @@
         return `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
     }
 
-    function playTrack(track) {
-        currentTrack = track;
-        isPlaying = true;
-    }
-
-    function togglePlay() {
-        isPlaying = !isPlaying;
-    }
 
     async function setTab(tab) {
         activeTab = tab;
@@ -490,12 +586,12 @@
                 </div>
                 <div class="player-controls">
                     <div class="ctrl-btns">
-                        <button class="ctrl-btn">⏮</button>
+                        <button class="ctrl-btn" on:click={prevTrack}>⏮</button>
                         <button class="play-main" on:click={togglePlay}>{isPlaying ? '⏸' : '▶'}</button>
-                        <button class="ctrl-btn">⏭</button>
+                        <button class="ctrl-btn" on:click={nextTrack}>⏭</button>
                     </div>
                     <div class="progress-wrap">
-                        <span class="time">0:00</span>
+                        <span class="time">{formatDuration(currentPosition)}</span>
                         <div class="progress-track">
                             <div class="progress-fill" style="width:{progressWidth}%"></div>
                         </div>
@@ -504,8 +600,8 @@
                 </div>
                 <div class="player-right">
                     <span>🔊</span>
-                    <div class="vol-track">
-                        <div class="vol-fill"></div>
+                    <div class="vol-track" on:click={setVolume}>
+                        <div class="vol-fill" style="width:{volume * 100}%"></div>
                     </div>
                 </div>
             </div>
@@ -945,6 +1041,9 @@
         padding: 16px;
         border: 1px solid rgba(255, 252, 242, 0.08);
     }
+    .chart-box canvas {
+        max-height: 280px;
+    }
 
     /* TRACKS */
     .track-list {
@@ -1335,10 +1434,11 @@
     }
 
     .vol-track {
-        width: 70px;
-        height: 3px;
+        width: 100px;
+        height: 8px;
         background: rgba(255, 252, 242, 0.15);
         border-radius: 3px;
+        cursor: pointer;
     }
 
     .vol-fill {
