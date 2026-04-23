@@ -69,7 +69,7 @@
                 drawArtistChart();
             }, 100);
 
-            const { player, device_id } = await initPlayer(token, (state) => {
+            const {player, device_id} = await initPlayer(token, (state) => {
                 if (!state) return;
                 isPlaying = !state.paused;
                 currentPosition = state.position;
@@ -125,7 +125,7 @@
             data: {
                 labels,
                 datasets: [{
-                    label: 'Популарност',
+                    label: 'Popularity',
                     data: topTracks.slice(0, 7).map(t => t.popularity ?? 50),
                     backgroundColor: '#eb5e28',
                     borderRadius: 8,
@@ -196,15 +196,17 @@
                     legend: {
                         position: 'right',
                         labels: {
-                            color: '#ccc',
-                            font: { size: 11 },
-                            padding : 10,
+                            color: '#fffcf2',
+                            font: {size: 12},
+                            padding: 14,
                         }
+
                     }
                 }
             }
         });
     }
+
     function setVolume(e) {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -267,9 +269,9 @@
                 scales: {
                     r: {
                         min: 0, max: 100,
-                        ticks: {display: false},
-                        grid: {color: 'rgba(255,252,242,0.08)'},
-                        pointLabels: {color: '#ccc5b9', font: {size: 10}}
+                        ticks: { display: false },
+                        grid: { color: 'rgba(255,252,242,0.08)' },
+                        pointLabels: { color: '#fffcf2', font: { size: 12 } }
                     }
                 },
                 plugins: {legend: {display: false}}
@@ -281,11 +283,11 @@
         const avgPop = topTracks.reduce((s, t) => s + t.popularity, 0) / (topTracks.length || 1);
         const explicit = topTracks.filter(t => t.explicit).length / (topTracks.length || 1) * 100;
 
-        if (avgPop > 75 && explicit > 30) return { emoji: '🔥', label: 'Mainstream hit' };
-        if (avgPop > 75) return { emoji: '⭐', label: 'Popular taste' };
-        if (avgPop < 40) return { emoji: '🎸', label: 'Indie listener' };
-        if (explicit > 50) return { emoji: '😤', label: 'Intense' };
-        return { emoji: '😌', label: 'Balanced' };
+        if (avgPop > 75 && explicit > 30) return {emoji: '🔥', label: 'Mainstream hit'};
+        if (avgPop > 75) return {emoji: '⭐', label: 'Popular taste'};
+        if (avgPop < 40) return {emoji: '🎸', label: 'Indie listener'};
+        if (explicit > 50) return {emoji: '😤', label: 'Intense'};
+        return {emoji: '😌', label: 'Balanced'};
     }
 
     async function getRecommendations() {
@@ -409,8 +411,10 @@
                 <button class:active={activeTab === 'tracks'} on:click={() => setTab('tracks')}>Tracks</button>
                 <button class:active={activeTab === 'artists'} on:click={() => setTab('artists')}>Artists</button>
                 <button class:active={activeTab === 'mood'} on:click={() => setTab('mood')}>Mood</button>
-                <button class:active={activeTab === 'recommended'} on:click={() => setTab('recommended')}>Recommended</button>
-                <button class:active={activeTab === 'artist'} on:click={() => setTab('artist')}>Artist breakdown</button>
+                <button class:active={activeTab === 'recommended'} on:click={() => setTab('recommended')}>Recommended
+                </button>
+                <button class:active={activeTab === 'artist'} on:click={() => setTab('artist')}>Artist breakdown
+                </button>
             </div>
             <div class="nav-right">
                 {#if user?.images?.[0]?.url}
@@ -477,7 +481,7 @@
                 <div class="section">
                     <div class="section-header"><h3>Top Tracks Popularity</h3></div>
                     <div class="chart-box">
-                        <canvas bind:this={popularityChartEl}></canvas>
+                        <canvas id="popularityChart" bind:this={popularityChartEl}></canvas>
                     </div>
                 </div>
 
@@ -553,7 +557,7 @@
                         <span class="mood-label">{getMoodEmoji().label}</span>
                     </div>
                     <div class="chart-box">
-                        <canvas bind:this={moodChartEl}></canvas>
+                        <canvas id="moodChart" bind:this={moodChartEl}></canvas>
                     </div>
                     <div class="mood-bars">
                         {#each [
@@ -781,7 +785,9 @@
     }
 
     @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+            transform: rotate(360deg);
+        }
     }
 
     .app {
@@ -1025,16 +1031,18 @@
         font-size: 11px;
         color: #ccc5b9;
     }
+
     .chart-box {
         background: var(--card);
         border-radius: 18px;
         padding: 24px;
         border: 1px solid var(--glass);
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-        height:600px
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        height: 600px
     }
+
     canvas {
-        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));
+        filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
     }
 
     .chart-box canvas {
@@ -1125,6 +1133,13 @@
         color: #ccc5b9;
     }
 
+    #popularityChart {
+        width: 100% !important;
+        max-width: 900px;
+        height: 420px !important;
+        font-size: 50px
+    }
+
     .pop-badge {
         background: rgba(255, 77, 125, 0.15);
         color: #eb5e28;
@@ -1158,8 +1173,12 @@
     }
 
     @keyframes bounce {
-        0%, 100% { height: 4px }
-        50% { height: 14px }
+        0%, 100% {
+            height: 4px
+        }
+        50% {
+            height: 14px
+        }
     }
 
     .artists-grid {
@@ -1436,6 +1455,7 @@
         background: white;
         border-radius: 3px;
     }
+
     .chart-box {
         position: relative;
         display: flex;
@@ -1448,7 +1468,7 @@
         background: rgba(20, 20, 20, 0.55);
         backdrop-filter: blur(10px);
 
-        box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
 
         transition: all 0.3s ease;
     }
@@ -1462,13 +1482,20 @@
         width: 380px !important;
         height: 380px !important;
     }
+
     .chart-box::before {
         content: "";
         position: absolute;
         inset: -30%;
-        background: radial-gradient(circle, rgba(255,106,0,0.18), transparent 60%);
+        background: radial-gradient(circle, rgba(255, 106, 0, 0.18), transparent 60%);
         opacity: 0.6;
         filter: blur(20px);
         z-index: 0;
+    }
+
+    #moodChart {
+        width: 100% !important;
+        max-width: 800px;
+        height: 500px !important;
     }
 </style>
