@@ -250,19 +250,31 @@
         if (explicit > 50) return { emoji: '😤', label: 'Intense' };
         return { emoji: '😌', label: 'Balanced' };
     }
-
     async function getRecommendations() {
-        if (!token || !topTracks.length || !topArtists.length) return;
+        if (!token) return;
 
         loadingRecs = true;
 
         try {
-            const endpoint =
-                `recommendations?limit=10&seed_artists=${topArtists[0].id}`;
-            const data = await fetchSpotify(endpoint, token);
-            recommendations = data.tracks || [];
+            const [medium, long] = await Promise.all([
+                fetchSpotify('/me/top/tracks?limit=50&time_range=medium_term', token),
+                fetchSpotify('/me/top/tracks?limit=50&time_range=long_term', token),
+            ]);
+
+            const all = [...(medium.items || []), ...(long.items || [])]
+                .filter(t => !topTracks.find(tt => tt.id === t.id))
+                .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i);
+
+            // Shuffle
+            for (let i = all.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [all[i], all[j]] = [all[j], all[i]];
+            }
+
+            recommendations = all.slice(0, 10);
+
         } catch (err) {
-            console.error(err);
+            console.error("getRecommendations failed:", err);
         } finally {
             loadingRecs = false;
         }
