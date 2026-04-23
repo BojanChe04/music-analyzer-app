@@ -1,6 +1,5 @@
 <script>
     import {onMount, tick} from 'svelte';
-    //import {login, getToken, fetchSpotify} from './lib/spotify.js';
     import {Chart, registerables} from 'chart.js';
     import {login, getToken, fetchSpotify, initPlayer, playTrackOnDevice} from './lib/spotify.js';
 
@@ -29,6 +28,9 @@
 
     let volume = 0.5;
 
+    let artistChartEl;
+    let artistChart;
+
     onMount(async () => {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
@@ -50,18 +52,13 @@
             ]);
             user = userData;
             topTracks = tracksData.items || [];
-            console.log('RAW tracksData:', JSON.stringify(tracksData).slice(0, 500));
-            console.log('topTracks[0]:', topTracks[0]);
-            console.log('popularity check:', topTracks[0]?.popularity);
             topArtists = artistsData.items || [];
 
-            // Fetch popularity одделно бидејќи /me/top/tracks не го враќа
             const rawTracks = tracksData.items || [];
             topTracks = rawTracks.map((t, i) => ({
                 ...t,
                 popularity: Math.round(100 - (i * (100 / rawTracks.length)))
             }));
-
 
             if (topTracks.length > 0) currentTrack = topTracks[0];
             loading = false;
@@ -69,22 +66,9 @@
             await tick();
             setTimeout(() => {
                 drawPopularityChart();
+                drawArtistChart();
             }, 100);
-            console.log('topTracks:', topTracks.map(t => ({ name: t.name, popularity: t.popularity })));
-            //drawMoodChart();
 
-            // const { player, device_id } = await initPlayer(token, (state) => {
-            //     if (!state) return;
-            //     isPlaying = !state.paused;
-            //     progressWidth = state.duration > 0 ? (state.position / state.duration) * 100 : 0;
-            //     const uri = state.track_window?.current_track?.uri;
-            //     if (uri) {
-            //         const matched = topTracks.find(t => t.uri === uri);
-            //         if (matched) currentTrack = matched;
-            //     }
-            // });
-            // spotifyPlayer = player;
-            // deviceId = device_id;
             const { player, device_id } = await initPlayer(token, (state) => {
                 if (!state) return;
                 isPlaying = !state.paused;
@@ -111,8 +95,8 @@
             spotifyPlayer = player;
             deviceId = device_id;
         }
-
     });
+
     async function playTrack(track) {
         currentTrack = track;
         if (!deviceId) return;
@@ -124,15 +108,11 @@
         if (spotifyPlayer) spotifyPlayer.togglePlay();
     }
 
-
     function drawPopularityChart() {
-        //const canvas = document.getElementById('popularityChart');
         if (!popularityChartEl) {
             console.warn('Canvas not ready');
             return;
         }
-        console.log('Drawing chart with tracks:', topTracks.slice(0, 7).map(t => t.popularity));
-        //if (popularityChart) popularityChart.destroy();
         if (popularityChart) {
             popularityChart.destroy();
             popularityChart = null;
@@ -165,20 +145,79 @@
             }
         });
     }
-    console.log('First track full object:', JSON.stringify(topTracks[0], null, 2));
+
+    function drawArtistChart() {
+        if (!artistChartEl) return;
+
+        if (artistChart) {
+            artistChart.destroy();
+            artistChart = null;
+        }
+
+        if (!topTracks || topTracks.length === 0) return;
+
+        const artistCount = {};
+
+        topTracks.forEach(track => {
+            track.artists.forEach(a => {
+                artistCount[a.name] = (artistCount[a.name] || 0) + 1;
+            });
+        });
+
+        const sorted = Object.entries(artistCount)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6);
+
+        const labels = sorted.map(([name]) => name);
+        const data = sorted.map(([, count]) => count);
+
+        const colors = [
+            '#ff5a1f', '#ff6f3c', '#ff844f',
+            '#ff9a66', '#ffb07d', '#ffc699'
+        ];
+
+        const ctx = artistChartEl.getContext('2d');
+
+        artistChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels,
+                datasets: [{
+                    data,
+                    backgroundColor: colors.slice(0, data.length),
+                    borderWidth: 0,
+                    hoverOffset: 18,
+                    offset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#ccc',
+                            font: { size: 11 },
+                            padding : 10,
+                        }
+                    }
+                }
+            }
+        });
+    }
     function setVolume(e) {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         volume = Math.max(0, Math.min(1, x / rect.width));
         if (spotifyPlayer) spotifyPlayer.setVolume(volume);
     }
+
     async function prevTrack() {
         if (!spotifyPlayer) return;
         const index = topTracks.findIndex(t => t.id === currentTrack?.id);
         if (index > 0) {
             await playTrack(topTracks[index - 1]);
         } else {
-
             await spotifyPlayer.seek(0);
             currentPosition = 0;
             progressWidth = 0;
@@ -194,9 +233,7 @@
     }
 
     function drawMoodChart() {
-        const canvas = document.getElementById('moodChart');
         if (!moodChartEl) return;
-        //if (moodChart) moodChart.destroy();
         if (moodChart) {
             moodChart.destroy();
             moodChart = null;
@@ -250,11 +287,10 @@
         if (explicit > 50) return { emoji: '😤', label: 'Intense' };
         return { emoji: '😌', label: 'Balanced' };
     }
+
     async function getRecommendations() {
         if (!token) return;
-
         loadingRecs = true;
-
         try {
             const [medium, long] = await Promise.all([
                 fetchSpotify('/me/top/tracks?limit=50&time_range=medium_term', token),
@@ -265,14 +301,12 @@
                 .filter(t => !topTracks.find(tt => tt.id === t.id))
                 .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i);
 
-            // Shuffle
             for (let i = all.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [all[i], all[j]] = [all[j], all[i]];
             }
 
             recommendations = all.slice(0, 10);
-
         } catch (err) {
             console.error("getRecommendations failed:", err);
         } finally {
@@ -288,12 +322,12 @@
         return `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
     }
 
-
     async function setTab(tab) {
         activeTab = tab;
         await tick();
         if (tab === 'mood') drawMoodChart();
         if (tab === 'overview') drawPopularityChart();
+        if (tab === 'artist') drawArtistChart();
     }
 
     function logout() {
@@ -317,13 +351,6 @@
     ];
 </script>
 
-<!--{#if !token}-->
-<!--  <div class="login">-->
-<!--    <img src="../public/♫ (1).png" alt="Sound Alchemy" class="logo-img"/>-->
-<!--    <h1>Sound Alchemy</h1>-->
-<!--    <p>Analyze Your Audio Identity</p>-->
-<!--    <button class="spotify-btn" on:click={login}>Continue with Spotify</button>-->
-<!--  </div>-->
 {#if !token}
     <div class="login">
         <div class="sa-logo">
@@ -382,9 +409,8 @@
                 <button class:active={activeTab === 'tracks'} on:click={() => setTab('tracks')}>Tracks</button>
                 <button class:active={activeTab === 'artists'} on:click={() => setTab('artists')}>Artists</button>
                 <button class:active={activeTab === 'mood'} on:click={() => setTab('mood')}>Mood</button>
-                <button class:active={activeTab === 'recommended'} on:click={() => setTab('recommended')}>
-                    Recommended
-                </button>
+                <button class:active={activeTab === 'recommended'} on:click={() => setTab('recommended')}>Recommended</button>
+                <button class:active={activeTab === 'artist'} on:click={() => setTab('artist')}>Artist breakdown</button>
             </div>
             <div class="nav-right">
                 {#if user?.images?.[0]?.url}
@@ -421,8 +447,6 @@
         <div class="content">
 
             {#if activeTab === 'overview'}
-
-                <!-- Top Albums row -->
                 <div class="section">
                     <div class="section-header">
                         <h3>Top albums</h3>
@@ -450,7 +474,6 @@
                     </div>
                 </div>
 
-                <!-- Chart -->
                 <div class="section">
                     <div class="section-header"><h3>Top Tracks Popularity</h3></div>
                     <div class="chart-box">
@@ -514,6 +537,14 @@
                     </div>
                 </div>
 
+            {:else if activeTab === 'artist'}
+                <div class="section">
+                    <div class="section-header"><h3>Artist Breakdown</h3></div>
+                    <div class="chart-box" style="height:300px;">
+                        <canvas bind:this={artistChartEl}></canvas>
+                    </div>
+                </div>
+
             {:else if activeTab === 'mood'}
                 <div class="section">
                     <div class="section-header"><h3>Your Music Profile</h3></div>
@@ -541,6 +572,7 @@
                         {/each}
                     </div>
                 </div>
+
             {:else if activeTab === 'recommended'}
                 <div class="section">
                     <div class="section-header"
@@ -548,14 +580,12 @@
                         <h3>Recommended for you</h3>
                         <button class="logout-btn" on:click={getRecommendations}>Refresh</button>
                     </div>
-
                     {#if loadingRecs}
                         <div class="spinner"></div>
                     {:else}
                         <div class="track-list">
                             {#each recommendations as track, i}
                                 <div class="track-item" on:click={() => playTrack(track)}>
-
                                     <div class="track-thumb">
                                         {#if track.album?.images?.[2]?.url}
                                             <img src={track.album.images[2].url}/>
@@ -565,22 +595,21 @@
                                             </div>
                                         {/if}
                                     </div>
-
                                     <div class="track-info">
                                         <div class="track-name">{track.name}</div>
                                         <div class="track-artist">{track.artists[0].name}</div>
                                     </div>
-
                                     <span class="pop-badge">{track.popularity}</span>
                                 </div>
                             {/each}
                         </div>
                     {/if}
-
                 </div>
-            {/if}
-        </div>
 
+            {/if}
+
+        </div>
+        <!-- END CONTENT -->
 
         <!-- PLAYER BAR -->
         {#if currentTrack}
@@ -620,6 +649,8 @@
         {/if}
 
     </div>
+    <!-- END APP -->
+
 {/if}
 
 <style>
@@ -632,7 +663,6 @@
     }
 
     :global(body) {
-        /*background: #252422;*/
         background: #1a1917;
         color: white;
         font-family: 'Inter', sans-serif;
@@ -649,7 +679,6 @@
         gap: 0;
         background: #1a1917;
         color: white;
-
     }
 
     .sa-logo {
@@ -742,27 +771,6 @@
         background: #eb5e28;
     }
 
-    .logo-img {
-        width: 200px;
-        height: auto;
-        border-radius: 20px;
-        object-fit: contain;
-        filter: drop-shadow(0 4px 20px rgba(235, 94, 40, 0.3));
-    }
-
-    .logo {
-        font-size: 4rem;
-    }
-
-    .login h1 {
-        font-family: 'Inter', sans-serif;
-        font-size: 2.2rem;
-    }
-
-    .login p {
-        color: #ccc5b9;
-    }
-
     .spinner {
         width: 40px;
         height: 40px;
@@ -773,26 +781,7 @@
     }
 
     @keyframes spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    .spotify-btn {
-        background: #1DB954;
-        color: white;
-        border: none;
-        padding: 14px 36px;
-        border-radius: 50px;
-        font-size: 16px;
-        font-family: 'Inter', sans-serif;
-        cursor: pointer;
-        font-weight: 500;
-
-    }
-
-    .spotify-btn:hover {
-        background: #1aa34a;
+        to { transform: rotate(360deg); }
     }
 
     .app {
@@ -802,7 +791,6 @@
         min-height: 100vh;
     }
 
-    /* NAV */
     .nav {
         height: 100px;
         display: flex;
@@ -824,10 +812,6 @@
         display: flex;
         align-items: center;
         gap: 10px;
-    }
-
-    .nav-logo {
-        font-size: 1.4rem;
     }
 
     .nav-title {
@@ -880,7 +864,6 @@
         border-color: #ccc5b9;
     }
 
-    /* TABS */
     .tabs {
         display: flex;
         gap: 6px;
@@ -908,7 +891,6 @@
         background: rgba(255, 252, 242, 0.1);
     }
 
-    /* STATS */
     .stats-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -920,7 +902,6 @@
         background: #403d39;
         border-radius: 14px;
         padding: 16px;
-
         text-align: center;
         border: 1px solid rgba(255, 252, 242, 0.08);
     }
@@ -948,17 +929,16 @@
 
     .section-header {
         margin-bottom: 20px;
-        margin-top: 20px
+        margin-top: 20px;
     }
 
     .section-header h3 {
         font-family: 'Inter', sans-serif;
         font-size: 1.5rem;
         font-weight: 700;
-        padding: 10px
+        padding: 10px;
     }
 
-    /* ALBUMS */
     .albums-row {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
@@ -1045,25 +1025,23 @@
         font-size: 11px;
         color: #ccc5b9;
     }
-
-    /* CHART */
-
     .chart-box {
-        display: flex;
-        justify-content: center;
-        height: 600px;
-        background: #403d39;
-        border-radius: 14px;
-        padding: 30px;
-        border: 1px solid rgba(255, 252, 242, 0.08);
-
+        background: var(--card);
+        border-radius: 18px;
+        padding: 24px;
+        border: 1px solid var(--glass);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        height:600px
     }
+    canvas {
+        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));
+    }
+
     .chart-box canvas {
         max-height: 500px;
         align-content: center;
     }
 
-    /* TRACKS */
     .track-list {
         display: flex;
         flex-direction: column;
@@ -1156,7 +1134,6 @@
         border-radius: 50px;
     }
 
-    /* PLAYING INDICATOR */
     .playing-indicator {
         display: flex;
         gap: 2px;
@@ -1181,15 +1158,10 @@
     }
 
     @keyframes bounce {
-        0%, 100% {
-            height: 4px
-        }
-        50% {
-            height: 14px
-        }
+        0%, 100% { height: 4px }
+        50% { height: 14px }
     }
 
-    /* ARTISTS */
     .artists-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -1248,7 +1220,6 @@
         margin-top: 3px;
     }
 
-    /* MOOD */
     .mood-top {
         display: flex;
         flex-direction: column;
@@ -1310,7 +1281,6 @@
         text-align: right;
     }
 
-    /* PLAYER */
     .player-bar {
         position: fixed;
         bottom: 0;
@@ -1465,5 +1435,40 @@
         width: 70%;
         background: white;
         border-radius: 3px;
+    }
+    .chart-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 20px;
+        border-radius: 18px;
+
+        background: rgba(20, 20, 20, 0.55);
+        backdrop-filter: blur(10px);
+
+        box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+
+        transition: all 0.3s ease;
+    }
+
+    .chart-box:hover {
+        transform: translateY(-6px) scale(1.01);
+        box-shadow: 0 20px 70px rgba(255, 106, 0, 0.15);
+    }
+
+    .chart-box canvas {
+        width: 380px !important;
+        height: 380px !important;
+    }
+    .chart-box::before {
+        content: "";
+        position: absolute;
+        inset: -30%;
+        background: radial-gradient(circle, rgba(255,106,0,0.18), transparent 60%);
+        opacity: 0.6;
+        filter: blur(20px);
+        z-index: 0;
     }
 </style>
