@@ -69,6 +69,8 @@
                 drawArtistChart();
             }, 100);
 
+            getRecommendations();
+
             const {player, device_id} = await initPlayer(token, (state) => {
                 if (!state) return;
                 isPlaying = !state.paused;
@@ -578,21 +580,54 @@
                 </div>
 
             {:else if activeTab === 'recommended'}
+<!--                <div class="section">-->
+<!--                    <div class="section-header"-->
+<!--                         style="display:flex; justify-content:center; align-items:center;">-->
+<!--                        <h3>Recommended for you</h3>-->
+<!--                        <button class="logout-btn" on:click={getRecommendations}>Refresh</button>-->
+<!--                    </div>-->
+<!--                    {#if loadingRecs}-->
+<!--                        <div class="spinner"></div>-->
+<!--                    {:else}-->
+<!--                        <div class="track-list">-->
+<!--                            {#each recommendations as track, i}-->
+<!--                                <div class="track-item" on:click={() => playTrack(track)}>-->
+<!--                                    <div class="track-thumb">-->
+<!--                                        {#if track.album?.images?.[2]?.url}-->
+<!--                                            <img src={track.album.images[2].url}/>-->
+<!--                                        {:else}-->
+<!--                                            <div class="thumb-placeholder"-->
+<!--                                                 style="background:{gradients[i % gradients.length]}">🎵-->
+<!--                                            </div>-->
+<!--                                        {/if}-->
+<!--                                    </div>-->
+<!--                                    <div class="track-info">-->
+<!--                                        <div class="track-name">{track.name}</div>-->
+<!--                                        <div class="track-artist">{track.artists[0].name}</div>-->
+<!--                                    </div>-->
+<!--                                    <span class="pop-badge">{track.popularity}</span>-->
+<!--                                </div>-->
+<!--                            {/each}-->
+<!--                        </div>-->
+<!--                    {/if}-->
+<!--                </div>-->
                 <div class="section">
-                    <div class="section-header"
-                         style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="section-header">
                         <h3>Recommended for you</h3>
-                        <button class="logout-btn" on:click={getRecommendations}>Refresh</button>
+                        <button class="refresh-btn" on:click={getRecommendations}>
+                            Refresh
+                        </button>
                     </div>
                     {#if loadingRecs}
                         <div class="spinner"></div>
                     {:else}
                         <div class="track-list">
                             {#each recommendations as track, i}
-                                <div class="track-item" on:click={() => playTrack(track)}>
+                                <div class="track-item" class:playing={currentTrack?.id === track.id}
+                                     on:click={() => playTrack(track)}>
                                     <div class="track-thumb">
                                         {#if track.album?.images?.[2]?.url}
-                                            <img src={track.album.images[2].url}/>
+                                            <img src={track.album.images[2].url} alt={track.name}/>
                                         {:else}
                                             <div class="thumb-placeholder"
                                                  style="background:{gradients[i % gradients.length]}">🎵
@@ -601,8 +636,14 @@
                                     </div>
                                     <div class="track-info">
                                         <div class="track-name">{track.name}</div>
-                                        <div class="track-artist">{track.artists[0].name}</div>
+                                        <div class="track-artist">{track.artists[0].name} · {track.album.name}</div>
                                     </div>
+                                    {#if currentTrack?.id === track.id}
+                                        <div class="playing-indicator">
+                                            <span></span><span></span><span></span>
+                                        </div>
+                                    {/if}
+                                    <span class="duration">{formatDuration(track.duration_ms)}</span>
                                     <span class="pop-badge">{track.popularity}</span>
                                 </div>
                             {/each}
@@ -672,6 +713,7 @@
         font-family: 'Inter', sans-serif;
         min-height: 100vh;
         margin: 0;
+        overflow-x: hidden;
     }
 
     .login {
@@ -795,6 +837,7 @@
         margin: 0;
         padding: 0 32px 100px;
         min-height: 100vh;
+        overflow-x: hidden;
     }
 
     .nav {
@@ -812,6 +855,7 @@
         z-index: 100;
         margin-left: -32px;
         margin-right: -32px;
+        overflow-x: hidden;
     }
 
     .nav-left {
@@ -867,7 +911,32 @@
 
     .logout-btn:hover {
         color: white;
-        border-color: #ccc5b9;
+        background: #eb5e28;
+        border-color: #eb5e28;
+    }
+    .refresh-btn {
+        background: linear-gradient(135deg, #eb5e28, #f07843);
+        color: white;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 50px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        transition: all 0.2s;
+        box-shadow: 0 4px 15px rgba(235, 94, 40, 0.3);
+        letter-spacing: 0.3px;
+        margin-top: 15px;
+    }
+
+    .refresh-btn:hover {
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 8px 25px rgba(235, 94, 40, 0.5);
+    }
+
+    .refresh-btn:active {
+        transform: scale(0.96);
     }
 
     .tabs {
@@ -900,7 +969,7 @@
     .stats-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 40px;
+        gap: 16px;
         margin-bottom: 24px;
     }
 
@@ -943,11 +1012,13 @@
         font-size: 1.5rem;
         font-weight: 700;
         padding: 10px;
+        margin-right: 20px;
     }
 
     .albums-row {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
+        /*grid-template-columns: repeat(6, 1fr);*/
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
         gap: 12px;
     }
 
@@ -1469,7 +1540,8 @@
         backdrop-filter: blur(10px);
 
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
-
+        max-width: 100%;
+        overflow: hidden;
         transition: all 0.3s ease;
     }
 
