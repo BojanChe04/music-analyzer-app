@@ -5,7 +5,8 @@
 
     Chart.register(...registerables);
 
-    let token = localStorage.getItem('spotify_token');
+   // let token = localStorage.getItem('spotify_token');
+    let token = null;
     let user = null;
     let topTracks = [];
     let topArtists = [];
@@ -35,12 +36,14 @@
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
 
-        if (code && !token) {
+        if (code) {
             loading = true;
             const data = await getToken(code);
             token = data.access_token;
             localStorage.setItem('spotify_token', token);
             window.history.replaceState({}, '', '/');
+        } else {
+            token = localStorage.getItem('spotify_token');
         }
 
         if (token) {
@@ -281,15 +284,55 @@
         });
     }
 
+    // function getMoodEmoji() {
+    //     const avgPop = topTracks.reduce((s, t) => s + t.popularity, 0) / (topTracks.length || 1);
+    //     const explicit = topTracks.filter(t => t.explicit).length / (topTracks.length || 1) * 100;
+    //
+    //     if (avgPop > 75 && explicit > 30) return {emoji: '🔥', label: 'Mainstream hit'};
+    //     if (avgPop > 75) return {emoji: '⭐', label: 'Popular taste'};
+    //     if (avgPop < 40) return {emoji: '🎸', label: 'Indie listener'};
+    //     if (explicit > 50) return {emoji: '😤', label: 'Intense'};
+    //     return {emoji: '😌', label: 'Balanced'};
+    // }
     function getMoodEmoji() {
         const avgPop = topTracks.reduce((s, t) => s + t.popularity, 0) / (topTracks.length || 1);
         const explicit = topTracks.filter(t => t.explicit).length / (topTracks.length || 1) * 100;
 
-        if (avgPop > 75 && explicit > 30) return {emoji: '🔥', label: 'Mainstream hit'};
-        if (avgPop > 75) return {emoji: '⭐', label: 'Popular taste'};
-        if (avgPop < 40) return {emoji: '🎸', label: 'Indie listener'};
-        if (explicit > 50) return {emoji: '😤', label: 'Intense'};
-        return {emoji: '😌', label: 'Balanced'};
+        const icons = {
+            mainstream: `<svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <polygon points="26,4 31,20 48,20 34,30 39,47 26,37 13,47 18,30 4,20 21,20" fill="#eb5e28"/>
+        </svg>`,
+            popular: `<svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <circle cx="26" cy="26" r="10" fill="#eb5e28"/>
+            <line x1="26" y1="2" x2="26" y2="10" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+            <line x1="26" y1="42" x2="26" y2="50" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+            <line x1="2" y1="26" x2="10" y2="26" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+            <line x1="42" y1="26" x2="50" y2="26" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+            <line x1="9" y1="9" x2="15" y2="15" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+            <line x1="37" y1="37" x2="43" y2="43" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+            <line x1="43" y1="9" x2="37" y2="15" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+            <line x1="15" y1="37" x2="9" y2="43" stroke="#eb5e28" stroke-width="3" stroke-linecap="round"/>
+        </svg>`,
+            indie: `<svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <path d="M4 26 Q10 14 18 26 Q26 38 34 26 Q42 14 48 26" stroke="#eb5e28" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M4 34 Q10 22 18 34 Q26 46 34 34 Q42 22 48 34" stroke="#eb5e28" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/>
+            <path d="M4 18 Q10 6 18 18 Q26 30 34 18 Q42 6 48 18" stroke="#eb5e28" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/>
+        </svg>`,
+            intense: `<svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <polyline points="4,26 14,10 22,36 30,8 38,32 48,26" stroke="#eb5e28" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`,
+            balanced: `<svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+            <circle cx="26" cy="26" r="20" stroke="#eb5e28" stroke-width="2.5" fill="none"/>
+            <circle cx="26" cy="26" r="12" stroke="#eb5e28" stroke-width="2" fill="none" opacity="0.6"/>
+            <circle cx="26" cy="26" r="5" fill="#eb5e28"/>
+        </svg>`,
+        };
+
+        if (avgPop > 75 && explicit > 30) return {emoji: icons.mainstream, label: 'Mainstream hit'};
+        if (avgPop > 75) return {emoji: icons.popular, label: 'Popular taste'};
+        if (avgPop < 40) return {emoji: icons.indie, label: 'Indie listener'};
+        if (explicit > 50) return {emoji: icons.intense, label: 'Intense'};
+        return {emoji: icons.balanced, label: 'Balanced mood'};
     }
 
     async function getRecommendations() {
@@ -316,6 +359,10 @@
         } finally {
             loadingRecs = false;
         }
+    }
+    function getExplicitPercent() {
+        if (topTracks.length === 0) return 0;
+        return Math.round(topTracks.filter(t => t.explicit).length / topTracks.length * 100);
     }
 
     function getTotalMinutes() {
@@ -439,12 +486,17 @@
                 <span class="stat-num">{topArtists.length}</span>
                 <span class="stat-label">Top artists</span>
             </div>
+<!--            <div class="stat-card">-->
+<!--                <span class="stat-num">{getTotalMinutes()}</span>-->
+<!--                <span class="stat-label">Minutes</span>-->
+<!--            </div>-->
             <div class="stat-card">
-                <span class="stat-num">{getTotalMinutes()}</span>
-                <span class="stat-label">Minutes</span>
+                <span class="stat-num">{getExplicitPercent()}%</span>
+                <span class="stat-label">Explicit</span>
             </div>
             <div class="stat-card">
-                <span class="stat-num">{getMoodEmoji().emoji}</span>
+<!--                <span class="stat-num">{getMoodEmoji().emoji}</span>-->
+                <span class="stat-num">{@html getMoodEmoji().emoji}</span>
                 <span class="stat-label">{getMoodEmoji().label}</span>
             </div>
         </div>
@@ -546,7 +598,7 @@
             {:else if activeTab === 'artist'}
                 <div class="section">
                     <div class="section-header"><h3>Artist Breakdown</h3></div>
-                    <div class="chart-box" style="height:300px;">
+                    <div class="chart-box" style="height:500px;">
                         <canvas bind:this={artistChartEl}></canvas>
                     </div>
                 </div>
@@ -555,7 +607,8 @@
                 <div class="section">
                     <div class="section-header"><h3>Your Music Profile</h3></div>
                     <div class="mood-top">
-                        <span class="big-emoji">{getMoodEmoji().emoji}</span>
+<!--                        <span class="big-emoji">{getMoodEmoji().emoji}</span>-->
+                        <span class="big-emoji">{@html getMoodEmoji().emoji}</span>
                         <span class="mood-label">{getMoodEmoji().label}</span>
                     </div>
                     <div class="chart-box">
@@ -580,37 +633,37 @@
                 </div>
 
             {:else if activeTab === 'recommended'}
-<!--                <div class="section">-->
-<!--                    <div class="section-header"-->
-<!--                         style="display:flex; justify-content:center; align-items:center;">-->
-<!--                        <h3>Recommended for you</h3>-->
-<!--                        <button class="logout-btn" on:click={getRecommendations}>Refresh</button>-->
-<!--                    </div>-->
-<!--                    {#if loadingRecs}-->
-<!--                        <div class="spinner"></div>-->
-<!--                    {:else}-->
-<!--                        <div class="track-list">-->
-<!--                            {#each recommendations as track, i}-->
-<!--                                <div class="track-item" on:click={() => playTrack(track)}>-->
-<!--                                    <div class="track-thumb">-->
-<!--                                        {#if track.album?.images?.[2]?.url}-->
-<!--                                            <img src={track.album.images[2].url}/>-->
-<!--                                        {:else}-->
-<!--                                            <div class="thumb-placeholder"-->
-<!--                                                 style="background:{gradients[i % gradients.length]}">🎵-->
-<!--                                            </div>-->
-<!--                                        {/if}-->
-<!--                                    </div>-->
-<!--                                    <div class="track-info">-->
-<!--                                        <div class="track-name">{track.name}</div>-->
-<!--                                        <div class="track-artist">{track.artists[0].name}</div>-->
-<!--                                    </div>-->
-<!--                                    <span class="pop-badge">{track.popularity}</span>-->
-<!--                                </div>-->
-<!--                            {/each}-->
-<!--                        </div>-->
-<!--                    {/if}-->
-<!--                </div>-->
+                <!--                <div class="section">-->
+                <!--                    <div class="section-header"-->
+                <!--                         style="display:flex; justify-content:center; align-items:center;">-->
+                <!--                        <h3>Recommended for you</h3>-->
+                <!--                        <button class="logout-btn" on:click={getRecommendations}>Refresh</button>-->
+                <!--                    </div>-->
+                <!--                    {#if loadingRecs}-->
+                <!--                        <div class="spinner"></div>-->
+                <!--                    {:else}-->
+                <!--                        <div class="track-list">-->
+                <!--                            {#each recommendations as track, i}-->
+                <!--                                <div class="track-item" on:click={() => playTrack(track)}>-->
+                <!--                                    <div class="track-thumb">-->
+                <!--                                        {#if track.album?.images?.[2]?.url}-->
+                <!--                                            <img src={track.album.images[2].url}/>-->
+                <!--                                        {:else}-->
+                <!--                                            <div class="thumb-placeholder"-->
+                <!--                                                 style="background:{gradients[i % gradients.length]}">🎵-->
+                <!--                                            </div>-->
+                <!--                                        {/if}-->
+                <!--                                    </div>-->
+                <!--                                    <div class="track-info">-->
+                <!--                                        <div class="track-name">{track.name}</div>-->
+                <!--                                        <div class="track-artist">{track.artists[0].name}</div>-->
+                <!--                                    </div>-->
+                <!--                                    <span class="pop-badge">{track.popularity}</span>-->
+                <!--                                </div>-->
+                <!--                            {/each}-->
+                <!--                        </div>-->
+                <!--                    {/if}-->
+                <!--                </div>-->
                 <div class="section">
                     <div class="section-header">
                         <h3>Recommended for you</h3>
@@ -973,16 +1026,38 @@
         margin-bottom: 24px;
     }
 
+    /*.stat-card {*/
+    /*    background: #403d39;*/
+    /*    border-radius: 14px;*/
+    /*    padding: 16px;*/
+    /*    text-align: center;*/
+    /*    border: 1px solid rgba(255, 252, 242, 0.08);*/
+    /*}*/
+
+    /*.stat-num {*/
+    /*    display: block;*/
+    /*    font-size: 1.8rem;*/
+    /*    font-weight: 700;*/
+    /*    color: #eb5e28;*/
+    /*    font-family: 'Inter', sans-serif;*/
+    /*}*/
     .stat-card {
         background: #403d39;
         border-radius: 14px;
         padding: 16px;
         text-align: center;
         border: 1px solid rgba(255, 252, 242, 0.08);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
     }
 
     .stat-num {
-        display: block;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 52px;  /* фиксна висина = висина на SVG иконата */
         font-size: 1.8rem;
         font-weight: 700;
         color: #eb5e28;
@@ -992,8 +1067,9 @@
     .stat-label {
         font-size: 0.75rem;
         color: #ccc5b9;
-        margin-top: 4px;
+        margin-top: 5px;
         display: block;
+
     }
 
     .content {
@@ -1569,5 +1645,11 @@
         width: 100% !important;
         max-width: 800px;
         height: 500px !important;
+    }
+
+    .stat-num {
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 </style>

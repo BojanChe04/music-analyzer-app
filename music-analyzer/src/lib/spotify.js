@@ -41,10 +41,23 @@ export async function getToken(code) {
     return res.json();
 }
 
+// export async function fetchSpotify(endpoint, token) {
+//     const res = await fetch(`https://api.spotify.com/v1${endpoint}`, {
+//         headers: { Authorization: `Bearer ${token}` },
+//     });
+//     return res.json();
+// }
 export async function fetchSpotify(endpoint, token) {
     const res = await fetch(`https://api.spotify.com/v1${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (res.status === 401) {
+        localStorage.removeItem('spotify_token');
+        window.location.href = '/';
+        return {};
+    }
+
     return res.json();
 }
 // ─── Web Playback SDK ─────────────────────────────────────────────
